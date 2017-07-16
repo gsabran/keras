@@ -603,6 +603,17 @@ class Model(Container):
     """The `Model` class adds training & evaluation routines to a `Container`.
     """
 
+    @property
+    def multipliers(self):
+        mults = {}
+        for layer in self.layers:
+            for weight in layer._layer_to_grad_multiplier:
+                if weight in mults:
+                    raise Exception('Received multiple learning rate multipliers '
+                                    'for one weight tensor: ' + str(weight))
+                mults[weight] = layer._layer_to_grad_multiplier[weight]
+        return mults
+
     def compile(self, optimizer, loss, metrics=None, loss_weights=None,
                 sample_weight_mode=None, **kwargs):
         """Configures the model for training.
@@ -934,6 +945,7 @@ class Model(Container):
             training_updates = self.optimizer.get_updates(
                 self._collected_trainable_weights,
                 self.constraints,
+                self.multipliers,
                 self.total_loss)
             updates = self.updates + training_updates
             # Gets loss and metrics. Updates weights at each call.

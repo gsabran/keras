@@ -212,6 +212,10 @@ class Layer(object):
         weights: The concatenation of the lists trainable_weights and
             non_trainable_weights (in this order).
         constraints: Dict mapping weights to constraints.
+        grad_multiplier: multiplier to be applied to the gradient.
+            It can be a number or a dictionary. If it's a number it's applied to all
+            trainable weights. If it's a dictionary, keys must match weights names like
+            { 'kernel': 2, 'bias': 1 }
 
     # Methods
         call(x, mask=None): Where the layer's logic lives.
@@ -274,6 +278,7 @@ class Layer(object):
                           'name',
                           'trainable',
                           'weights',
+                          'grad_multiplier',
                           'input_dtype',  # legacy
                           }
         for kwarg in kwargs:
@@ -311,6 +316,12 @@ class Layer(object):
             self._initial_weights = kwargs['weights']
         else:
             self._initial_weights = None
+
+        if 'grad_multiplier' in kwargs:
+            self.grad_multiplier = kwargs['grad_multiplier']
+        else:
+            self.grad_multiplier = None
+        self._layer_to_grad_multiplier = {}
 
     @property
     def losses(self):
@@ -395,6 +406,16 @@ class Layer(object):
             self.constraints[weight] = constraint
         if trainable:
             self._trainable_weights.append(weight)
+            if type(self.grad_multiplier) == dict:
+                if name in self.grad_multiplier:
+                    grad_mult = self.grad_multiplier[name]
+                else:
+                    grad_mult = 1.
+            elif self.grad_multiplier is not None:
+                grad_mult = self.grad_multiplier
+            else:
+                grad_mult = 1.
+            self._layer_to_grad_multiplier[weight] = float(grad_mult)
         else:
             self._non_trainable_weights.append(weight)
         return weight
